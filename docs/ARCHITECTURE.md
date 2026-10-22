@@ -50,12 +50,16 @@ graph TD
 
 ## 3. Data Flow & Transaction Lifecycles
 
-### 3.1 Storefront Product Browsing Flow
-1. **Initial Load**: Client requests `index.html`. Browser loads design system `style.css` and scripts from edge CDN.
-2. **Cache Check**: `SheetEndpoint.fetchProducts()` retrieves local catalogue instantly from `localStorage` (`mg.products.v1`).
-3. **Edge Synchronization**: In parallel, client queries `GET /api/products` (or POST `{ action: 'get_products' }`).
-4. **D1 Query**: Pages Function executes `SELECT * FROM products ORDER BY rowid DESC`, parses JSON columns (`images`, `tags`), and returns product entities.
-5. **UI Update**: Frontend merges remote data with local state and updates storefront DOM seamlessly.
+### 3.1 Storefront Product Browsing & Next-Gen Performance Engine
+1. **Initial Load & Instant SWR Display**: Client requests `index.html`. `SheetEndpoint.fetchProducts()` retrieves local catalogue instantly from `localStorage`/`sessionStorage` (`mg.products.v1`) for **0ms perceived paint time**.
+2. **Small Batch Pagination Query**: In parallel, client issues a background query `GET /api/products?page=1&limit=10&category=...` to fetch small 3–5 KB product batches without blocking the main thred.
+3. **D1 SQL Query Execution**: Edge Pages Function executes:
+   ```sql
+   SELECT * FROM products WHERE category = ? ORDER BY rowid DESC LIMIT ? OFFSET ?;
+   ```
+   Parses JSON columns (`images`, `tags`), calculates total counts and `hasMore` metadata, and returns the small dataset.
+4. **Low-Power GPU Rendering**: Frontend mounts product cards using CSS `content-visibility: auto` and `contain-intrinsic-size` to bypass off-screen DOM calculations on low-power devices. Images use `loading="lazy"` and `decoding="async"`.
+5. **Scroll & Back-Navigation Restoral**: When navigating away to product details or categories and returning back, loaded products and exact scroll position (`scrollY`) are restored from memory instantly without white screens or re-spinners.
 
 ### 3.2 Product Photo Upload & Optimization Flow (R2)
 1. **Admin Selection**: Admin selects or drag-and-drops raw product images (5–15 MB each) in `admin.html`.

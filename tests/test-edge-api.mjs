@@ -116,8 +116,17 @@ class MockD1 {
   }
 
   executeQuery(sql, params) {
+    if (sql.includes('SELECT COUNT(*) as total FROM products')) {
+      return [{ total: this.tables.products.size }];
+    }
     if (sql.includes('SELECT * FROM products')) {
-      return Array.from(this.tables.products.values());
+      let items = Array.from(this.tables.products.values());
+      if (sql.includes('LIMIT ? OFFSET ?') && params.length >= 2) {
+        const limit = params[params.length - 2];
+        const offset = params[params.length - 1];
+        items = items.slice(offset, offset + limit);
+      }
+      return items;
     }
     if (sql.includes('SELECT * FROM orders')) {
       return Array.from(this.tables.orders.values());
@@ -238,6 +247,11 @@ async function runTests() {
   const getProdsRes = await handleApiRequest(new Request('http://localhost/api/products', { method: 'GET' }), env);
   const getProdsData = await getProdsRes.json();
   assert(getProdsData.ok === true && getProdsData.products.length === 1, 'GET /api/products fetches products from D1');
+
+  // 4b. Small Batch Pagination & Filtering Test
+  const pageRes = await handleApiRequest(new Request('http://localhost/api/products?page=1&limit=10', { method: 'GET' }), env);
+  const pageData = await pageRes.json();
+  assert(pageData.ok === true && pageData.page === 1 && pageData.limit === 10 && pageData.hasMore === false, 'GET /api/products?page=1&limit=10 returns small batch dataset with pagination metadata');
 
   // 5. Orders: Place order & decrement stock in D1
   const orderRes = await handleApiRequest(new Request('http://localhost/api/orders', {

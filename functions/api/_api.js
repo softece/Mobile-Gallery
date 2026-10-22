@@ -112,7 +112,7 @@ export async function handleApiRequest(request, env, ctx) {
   // REST Routes:
   // --- Products ---
   if (pathname === '/api/products') {
-    if (method === 'GET') return getProducts(env);
+    if (method === 'GET') return getProducts(env, url);
     if (method === 'POST') return addOrUpdateProduct(body, env);
   }
 
@@ -172,7 +172,7 @@ async function dispatchAction(action, data, env, url) {
       });
 
     case 'get_products':
-      return getProducts(env);
+      return getProducts(env, url);
 
     case 'add_product':
       return addOrUpdateProduct(data, env);
@@ -365,55 +365,128 @@ function assertDb(env) {
   }
 }
 
+function formatProductRows(results) {
+  return (results || []).map(row => {
+    let images = [];
+    try {
+      images = typeof row.images === 'string' ? JSON.parse(row.images) : (row.images || []);
+    } catch (_) { images = []; }
+
+    let tags = [];
+    try {
+      tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []);
+    } catch (_) { tags = []; }
+
+    return {
+      id: row.id,
+      title: row.title,
+      brand: row.brand || '',
+      category: row.category || 'phone',
+      price: Number(row.price) || 0,
+      oldPrice: Number(row.old_price) || 0,
+      old_price: Number(row.old_price) || 0,
+      condition: row.condition || 'Brand New',
+      storage: row.storage || '',
+      ram: row.ram || '',
+      battery: row.battery || '',
+      display: row.display || '',
+      chip: row.chip || '',
+      camera: row.camera || '',
+      color: row.color || 'midnight',
+      warranty: row.warranty || '',
+      stock: Number(row.stock) || 0,
+      desc: row.description || '',
+      description: row.description || '',
+      status: row.status || 'Active',
+      images,
+      rating: Number(row.rating) || 5.0,
+      reviews: Number(row.reviews) || 0,
+      views: Number(row.views) || 0,
+      tags
+    };
+  });
+}
+
 /**
- * Fetch all products from D1
+ * Fetch products from D1 with pagination and small batch support
  */
-async function getProducts(env) {
+async function getProducts(env, url = null) {
   try {
     assertDb(env);
-    const { results } = await env.DB.prepare('SELECT * FROM products ORDER BY rowid DESC').all();
 
-    const formatted = (results || []).map(row => {
-      let images = [];
-      try {
-        images = typeof row.images === 'string' ? JSON.parse(row.images) : (row.images || []);
-      } catch (_) { images = []; }
+    let page = null;
+    let limit = null;
+    let category = null;
+    let search = null;
 
-      let tags = [];
-      try {
-        tags = typeof row.tags === 'string' ? JSON.parse(row.tags) : (row.tags || []);
-      } catch (_) { tags = []; }
+    if (url && url.searchParams) {
+      if (url.searchParams.has('page') || url.searchParams.has('limit')) {
+        page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10));
+        limit = Math.max(1, parseInt(url.searchParams.get('limit') || '10', 10));
+      }
+      if (url.searchParams.has('category')) {
+        category = url.searchParams.get('category');
+      }
+      if (url.searchParams.has('search')) {
+        search = url.searchParams.get('search');
+      }
+    }
 
-      return {
-        id: row.id,
-        title: row.title,
-        brand: row.brand || '',
-        category: row.category || 'phone',
-        price: Number(row.price) || 0,
-        oldPrice: Number(row.old_price) || 0,
-        old_price: Number(row.old_price) || 0,
-        condition: row.condition || 'Brand New',
-        storage: row.storage || '',
-        ram: row.ram || '',
-        battery: row.battery || '',
-        display: row.display || '',
-        chip: row.chip || '',
-        camera: row.camera || '',
-        color: row.color || 'midnight',
-        warranty: row.warranty || '',
-        stock: Number(row.stock) || 0,
-        desc: row.description || '',
-        description: row.description || '',
-        status: row.status || 'Active',
-        images,
-        rating: Number(row.rating) || 5.0,
-        reviews: Number(row.reviews) || 0,
-        views: Number(row.views) || 0,
-        tags
-      };
-    });
+    let query = 'SELECT * FROM products';
+    let countQuery = 'SELECT COUNT(*) as total FROM products';
+    const conditions = [];
+    const params = [];
 
-    return jsonResponse({ ok: true, products: formatted });
+    if (category && category !== 'all') {
+      conditions.push('category = ?');
+      params.push(category);
+    }
+
+    if (search && search.trim()) {
+      conditions.push('(title LIKE ? OR brand LIKE ? OR description LIKE ?)');
+      const term = `%${search.trim()}%`;
+      params.push(term, term, term);
+    }
+
+    if (conditions.length > 0) {
+      const whereClause = ' WHERE ' + conditions.join(' AND ');
+      query += whereClause;
+      countQuery += whereClause;
+    }
+
+    query += ' ORDER BY rowid DESC';
+
+    if (page !== null && limit !== null) {
+      const countStmt = env.DB.prepare(countQuery);
+      const countRes = conditions.length > 0 ? await countStmt.bind(...params).first() : await countStmt.first();
+      const total = countRes ? countRes.total : 0;
+
+      const offset = (page - 1) * limit;
+      query += ' LIMIT ? OFFSET ?';
+      const stmt = env.DB.prepare(query);
+      const queryParams = [...params, limit, offset];
+      const { results } = await stmt.bind(...queryParams).all();
+
+      const formatted = formatProductRows(results);
+      return jsonResponse({
+        ok: true,
+        products: formatted,
+        page,
+        limit,
+        total,
+        hasMore: (offset + formatted.length) < total
+      });
+    } else {
+      const stmt = env.DB.prepare(query);
+      const { results } = conditions.length > 0 ? await stmt.bind(...params).all() : await stmt.all();
+      const formatted = formatProductRows(results);
+      return jsonResponse({
+        ok: true,
+        products: formatted,
+        total: formatted.length,
+        hasMore: false
+      });
+    }
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message }, 500);
   }

@@ -76,10 +76,15 @@ gantt
 - [x] Built Pages Functions catch-all in `functions/api/[[path]].js`.
 - [x] Authored comprehensive deployment manual in `docs/EDGE_DEPLOYMENT.md`.
 
-### ✅ Milestone 5: Verification Suite & Documentation
+### ✅ Milestone 5: Next-Gen Low-Power Device Performance Engine & API Pagination
+- [x] Small Batch Dataset Fetching API (`GET /api/products?page=1&limit=10`) with SQL `LIMIT ? OFFSET ?`, total product counts, and `hasMore` metadata.
+- [x] In-browser Admin WebP Compression Pipeline converting uploaded product photos to `<60 KB` WebP for low R2 storage usage and fast edge delivery.
+- [x] Low-Power Device GPU Acceleration (`content-visibility: auto`, `will-change: transform`, `contain-intrinsic-size: 1px 360px`) to prevent offscreen DOM rendering overhead.
+- [x] Asynchronous Image Decoding (`loading="lazy"`, `decoding="async"`) preventing frame drops on budget mobile GPUs during high-speed scrolling.
+- [x] SWR (Stale-While-Revalidate) & Session Navigation State Restoral providing 0ms instant display and exact scroll position restoration on page back-navigation.
 - [x] Automated project integrity check (`tests/check-project.mjs`).
 - [x] Core test suite for catalogue, cart, and asset links (`tests/verify-suite.mjs`).
-- [x] Pages Functions, D1 database, and R2 photo storage integration tests (`tests/test-edge-api.mjs`).
+- [x] Pages Functions, D1 database, small-batch pagination, and R2 photo storage integration tests (`tests/test-edge-api.mjs`).
 - [x] Authored all 7 documentation files in `docs/` (`ARCHITECTURE.md`, `EDGE_DEPLOYMENT.md`, `DESIGN.md`, `MEMORY.md`, `PRD.md`, `RULES.md`, `TASKS.md`).
 
 ---

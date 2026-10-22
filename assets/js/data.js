@@ -308,7 +308,7 @@ function avatarColor(name) {
 }
 function deviceArt(item, size = 190) {
   if (item && item.images && item.images.length > 0) {
-    return `<img src="${esc(item.images[0])}" alt="${esc(item.title || '')}" width="${size}" height="${size}" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:var(--r-md)">`;
+    return `<img src="${esc(item.images[0])}" alt="${esc(item.title || '')}" width="${size}" height="${size}" loading="lazy" decoding="async" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:var(--r-md)">`;
   }
   const [c1, c2] = PALETTES[item.color] || PALETTES.midnight;
   const uid = '\x67' + item.id.replace(/[^a-z0-9]/gi, '');

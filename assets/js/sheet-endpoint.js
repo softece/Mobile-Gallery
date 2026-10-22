@@ -313,9 +313,43 @@ class SheetEndpoint {
     }
     return { ok: true, localOnly: true };
   }
-  static async fetchProducts() {
+  static async fetchProducts(options = {}) {
     if (this.isReady()) {
-      const res = await this.get('\x67\x65\x74\x5f\x70\x72\x6f\x64\x75\x63\x74\x73');
+      const page = options && options.page ? options.page : null;
+      const limit = options && options.limit ? options.limit : null;
+      const category = options && options.category ? options.category : null;
+      const search = options && options.search ? options.search : null;
+
+      const cfUrl = this.getEdgeUrl();
+      if (cfUrl && (page || limit || category || search)) {
+        try {
+          const params = new URLSearchParams();
+          params.append('action', 'get_products');
+          if (page) params.append('page', page);
+          if (limit) params.append('limit', limit);
+          if (category) params.append('category', category);
+          if (search) params.append('search', search);
+
+          const queryUrl = cfUrl + (cfUrl.includes('?') ? '&' : '?') + params.toString();
+          const res = await fetch(queryUrl, { method: 'GET' });
+          if (res.ok) {
+            const json = await res.json();
+            if (json.ok && Array.isArray(json.products)) {
+              if (!page || page === 1) {
+                const local = this.getLocal(LOCAL_PRODUCTS_KEY, []);
+                const sheetIds = new Set(json.products.map(p => p.id));
+                const merged = [...json.products, ...local.filter(p => !sheetIds.has(p.id))];
+                this.setLocal(LOCAL_PRODUCTS_KEY, merged);
+              }
+              return json.products;
+            }
+          }
+        } catch (err) {
+          console.warn('Endpoint: fetchProducts with params failed, falling back:', err);
+        }
+      }
+
+      const res = await this.get('get_products');
       if (res.ok && Array.isArray(res.products) && res.products.length > 0) {
         const local = this.getLocal(LOCAL_PRODUCTS_KEY, []);
         const sheetIds = new Set(res.products.map(p => p.id));

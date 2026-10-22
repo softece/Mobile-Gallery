@@ -1496,6 +1496,8 @@ input[type="range"]::-moz-range-thumb {
               border-color .18s var(--ease);
   will-change: transform, box-shadow;
   backface-visibility: hidden;
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 360px;
 }
 .card:hover {
   transform: perspective(1000px) translate3d(0, -8px, 12px) rotateX(1.5deg);
